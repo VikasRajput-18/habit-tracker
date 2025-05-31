@@ -2,21 +2,23 @@ import {
   client,
   DATABASE_ID,
   databases,
+  HABIT_COMPLETION_COLLECTION_ID,
   HABITS_COLLECTION_ID,
   RealTimeResponse,
 } from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
-import { Habit } from "@/types/database.type";
+import { Habit, HabitCompletion } from "@/types/database.type";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useEffect, useRef, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
-import { Query } from "react-native-appwrite";
+import { ID, Query } from "react-native-appwrite";
 import { Swipeable } from "react-native-gesture-handler";
 import { Button, Card, Surface, Text, useTheme } from "react-native-paper";
 
 export default function Index() {
   const { signOut, user } = useAuth();
   const [habits, setHabits] = useState<Habit[]>([]);
+  const [completedHabits, setCompletedHabits] = useState<string[]>([]);
   const theme = useTheme();
 
   const swipeableRefs = useRef<{ [key: string]: Swipeable | null }>({});
@@ -33,7 +35,25 @@ export default function Index() {
       console.error(error);
     }
   };
+  const fetchTodayCompletions = async () => {
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const response = await databases.listDocuments(
+        DATABASE_ID,
+        HABIT_COMPLETION_COLLECTION_ID,
+        [
+          Query.equal("user_id", user?.$id ?? ""),
+          Query.greaterThanEqual("completed_at", today.toISOString()),
+        ]
+      );
+      const completions = response?.documents as HabitCompletion[];
 
+      setCompletedHabits(completions.map((c) => c.habit_id));
+    } catch (error) {
+      console.error(error);
+    }
+  };
   const handleDeleteHabit = async (id: string) => {
     try {
       await databases.deleteDocument(DATABASE_ID, HABITS_COLLECTION_ID, id);
@@ -41,6 +61,34 @@ export default function Index() {
       console.error(error);
     }
   };
+
+  const handleCompleteHabit = async (id: string) => {
+    if (!user || completedHabits.includes(id)) return;
+    try {
+      let currentDate = new Date().toISOString();
+      await databases.createDocument(
+        DATABASE_ID,
+        HABIT_COMPLETION_COLLECTION_ID,
+        ID.unique(),
+        {
+          habit_id: id,
+          user_id: user.$id,
+          completed_at: currentDate,
+        }
+      );
+      const habit = habits.find((habit) => habit.$id === id);
+      if (!habit) return;
+      await databases.updateDocument(DATABASE_ID, HABITS_COLLECTION_ID, id, {
+        streak_count: habit.streak_count + 1,
+        last_completed: currentDate,
+      });
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const isHabitCompleted = (habitId: string) =>
+    completedHabits?.includes(habitId);
 
   const renderLeftActions = () => {
     return (
@@ -53,23 +101,27 @@ export default function Index() {
       </View>
     );
   };
-  const renderRightActions = () => {
+  const renderRightActions = (habitId: string) => {
     return (
       <View style={styles.swipeActionRight}>
-        <MaterialCommunityIcons
-          name="check-circle-outline"
-          size={32}
-          color={"#fff"}
-        />
+        {isHabitCompleted(habitId) ? (
+          <Text style={styles.completedText}>Completed</Text>
+        ) : (
+          <MaterialCommunityIcons
+            name="check-circle-outline"
+            size={32}
+            color={"#fff"}
+          />
+        )}
       </View>
     );
   };
 
   useEffect(() => {
     if (user) {
-      const channel = `databases.${DATABASE_ID}.collections.${HABITS_COLLECTION_ID}.documents`;
+      const habitsChannel = `databases.${DATABASE_ID}.collections.${HABITS_COLLECTION_ID}.documents`;
       const habitsSubscription = client.subscribe(
-        channel,
+        habitsChannel,
         (response: RealTimeResponse) => {
           if (
             response.events.includes(
@@ -92,9 +144,26 @@ export default function Index() {
           }
         }
       );
+      const completionChannel = `databases.${DATABASE_ID}.collections.${HABIT_COMPLETION_COLLECTION_ID}.documents`;
+      const complitionsSubscription = client.subscribe(
+        completionChannel,
+        (response: RealTimeResponse) => {
+          if (
+            response.events.includes(
+              "databases.*.collections.*.documents.*.create"
+            )
+          ) {
+            fetchTodayCompletions();
+          }
+        }
+      );
       fetchHabits();
+      fetchTodayCompletions();
 
-      return () => habitsSubscription();
+      return () => {
+        habitsSubscription();
+        complitionsSubscription();
+      };
     }
   }, [user]);
   return (
@@ -134,15 +203,25 @@ export default function Index() {
               overshootLeft={false}
               overshootRight={false}
               renderLeftActions={renderLeftActions}
-              renderRightActions={renderRightActions}
+              renderRightActions={() => renderRightActions(habit.$id)}
               onSwipeableOpen={(direction) => {
                 if (direction === "left") {
                   handleDeleteHabit(habit.$id);
+                } else if (direction === "right") {
+                  handleCompleteHabit(habit.$id);
                 }
                 swipeableRefs.current[habit.$id]?.close();
               }}
             >
-              <Surface style={styles.card} elevation={0}>
+              <Surface
+                style={[
+                  styles.card,
+                  isHabitCompleted(habit.$id)
+                    ? styles.cardCompleted
+                    : styles.cardCompleted,
+                ]}
+                elevation={0}
+              >
                 <Card
                   style={{
                     borderColor: "#ccc",
@@ -247,6 +326,10 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 4,
   },
+
+  cardCompleted: {
+    opacity: 0.6,
+  },
   cardContent: {
     marginTop: 10,
   },
@@ -288,5 +371,10 @@ const styles = StyleSheet.create({
     marginBottom: 18,
     marginTop: 2,
     paddingRight: 16,
+  },
+  completedText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "bold",
   },
 });
