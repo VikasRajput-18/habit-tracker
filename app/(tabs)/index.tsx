@@ -216,9 +216,7 @@ export default function Index() {
               <Surface
                 style={[
                   styles.card,
-                  isHabitCompleted(habit.$id)
-                    ? styles.cardCompleted
-                    : styles.cardCompleted,
+                  isHabitCompleted(habit.$id) ? styles.cardCompleted : {},
                 ]}
                 elevation={0}
               >

@@ -14,3 +14,9 @@ export interface HabitCompletion extends Models.Document {
   user_id: string;
   completed_at: string;
 }
+
+export interface StreakData {
+  streak: number;
+  bestStreak: number;
+  total: number;
+}
