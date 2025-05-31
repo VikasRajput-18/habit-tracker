@@ -1,5 +1,4 @@
 import { useAuth } from "@/lib/auth-context";
-import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { KeyboardAvoidingView, Platform, StyleSheet, View } from "react-native";
@@ -50,52 +49,50 @@ export default function AuthScreen() {
   };
 
   return (
-    <LinearGradient colors={["#e0f7fa", "#fce4ec"]} style={styles.container}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={styles.container}
-      >
-        <View style={styles.content}>
-          <Text style={styles.title} variant="headlineMedium">
-            {isSignUp ? "Create Account" : "Welcome Back"}
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      style={styles.container}
+    >
+      <View style={styles.content}>
+        <Text style={styles.title} variant="headlineMedium">
+          {isSignUp ? "Create Account" : "Welcome Back"}
+        </Text>
+
+        <TextInput
+          label="Email"
+          autoCapitalize="none"
+          keyboardType="email-address"
+          placeholder="example@gmail.com"
+          mode="outlined"
+          style={styles.input}
+          onChangeText={setEmail}
+        />
+        <TextInput
+          label="Password"
+          autoCapitalize="none"
+          secureTextEntry
+          mode="outlined"
+          style={styles.input}
+          onChangeText={setPassword}
+        />
+        {error && <Text style={{ color: theme.colors.error }}>{error}</Text>}
+
+        <Button onPress={handleAuth} mode="contained" style={styles.button}>
+          {isSignUp ? "Sign Up" : "Sign In"}
+        </Button>
+        <Button
+          mode="text"
+          style={styles.switchMode}
+          onPress={handleSwitchMode}
+        >
+          <Text>
+            {isSignUp
+              ? "Already have an account? Sign In"
+              : "Don't have an account? Sign Up"}
           </Text>
-
-          <TextInput
-            label="Email"
-            autoCapitalize="none"
-            keyboardType="email-address"
-            placeholder="example@gmail.com"
-            mode="outlined"
-            style={styles.input}
-            onChangeText={setEmail}
-          />
-          <TextInput
-            label="Password"
-            autoCapitalize="none"
-            secureTextEntry
-            mode="outlined"
-            style={styles.input}
-            onChangeText={setPassword}
-          />
-          {error && <Text style={{ color: theme.colors.error }}>{error}</Text>}
-
-          <Button onPress={handleAuth} mode="contained" style={styles.button}>
-            {isSignUp ? "Sign Up" : "Sign In"}
-          </Button>
-          <Button
-            mode="text"
-            style={styles.switchMode}
-            onPress={handleSwitchMode}
-          >
-            <Text>
-              {isSignUp
-                ? "Already have an account? Sign In"
-                : "Don't have an account? Sign Up"}
-            </Text>
-          </Button>
-        </View>
-      </KeyboardAvoidingView>
-    </LinearGradient>
+        </Button>
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 
